@@ -9,6 +9,7 @@ Inputs:
 * STAR genome build for genome reads will be aligned to
 * .gff file for genome reads will be aligned to
 * .txt file with desired differential expression comparisons
+* .txt file with meta data on samples (conditions, etc.)
 
 Outputs: 
 
