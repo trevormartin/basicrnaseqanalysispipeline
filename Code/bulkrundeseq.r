@@ -67,7 +67,12 @@ for(i in 1:length(comparisonsfile)) {
 	rownames(curcolData) = allcolData$Sample.IDmod[pullcols]
 	curcountdata = countData3[,pullcounts]
 	curcountdataorder = curcountdata[,match(colnames(curcountdata),rownames(curcolData))]
+	if(length(unique(curcolData$group))>1) {
 	dds = DESeqDataSetFromMatrix(countData = curcountdataorder, colData = curcolData, design = ~ group)
+	}
+	if(length(unique(curcolData$group))==1) { # Fall back on no replicates method if there are no replicates
+	dds = DESeqDataSetFromMatrix(countData = curcountdataorder, colData = curcolData, design = ~ condition)
+	}
 	dds = DESeq(dds)
 	res = results(dds)
 	ressort = res[order(res$padj,decreasing=FALSE),]
