@@ -7,10 +7,11 @@
 setwd("~/jen/Files/")
 require(DESeq2)
 require(plyr)
+require(biomaRt)
 
 ##### Part 1: Read in the data
 
-alldirectories = c("run60msrnaseqwtsplnlungbbreg","run61msrnaseqdkospbbregwtlnbreg","run68mousernaseqtregsplnlung")
+alldirectories = c("run60msrnaseqwtsplnlungbbreg","run61msrnaseqdkospbbregwtlnbreg","run68mousernaseqtregsplnlung","run69mousernaseqtregs")
 countdirectory="/home/trevor/jen/counts/"
 summarytabledirectory="/home/trevor/jen/summarytables/"
 
@@ -33,7 +34,7 @@ for(i in 1:length(alldirectories)) {
 	curtablefilec[[i]]$Sample.IDmod = paste(substr(curdirectory,1,5),curtablefilec[[i]][,3],sep="")
 }
 # Comparisons data
-fc = file(paste(summarytabledirectory,"mousecomparisons.txt",sep=""))
+fc = file(paste(summarytabledirectory,"mousecomparisonswreps.txt",sep=""))
 comparisonsfile = strsplit(readLines(fc), "\t")
 close(fc)
 
@@ -52,20 +53,36 @@ countData3 = countData2[-which(apply(countData2,1,sum)==0),]
 allresults = vector("list",length(comparisonsfile))
 for(i in 1:length(comparisonsfile)) {
 	print(i)
-	curcomps = comparisonsfile[[i]]
+	curcompsi = comparisonsfile[[i]]
+	curcomps = NULL
+	cursets = NULL
+	for(j in 1:length(curcompsi)) {
+		pullcomps = unlist(strsplit(curcompsi[[j]],split=" "))
+		curcomps = c(curcomps,pullcomps)
+		cursets = c(cursets,rep(j,length(pullcomps)))
+	}
 	pullcounts = which(colnames(countData3)%in%curcomps)
 	pullcols = which(allcolData$Sample.IDmod%in%curcomps)
-	curcolData = data.frame(condition=allcolData$Sample.Description[pullcols])
+	curcolData = data.frame(condition=allcolData$Sample.Description[pullcols],group=as.factor(cursets))
 	rownames(curcolData) = allcolData$Sample.IDmod[pullcols]
 	curcountdata = countData3[,pullcounts]
 	curcountdataorder = curcountdata[,match(colnames(curcountdata),rownames(curcolData))]
-	dds = DESeqDataSetFromMatrix(countData = curcountdataorder, colData = curcolData, design = ~ condition)
+	dds = DESeqDataSetFromMatrix(countData = curcountdataorder, colData = curcolData, design = ~ group)
 	dds = DESeq(dds)
 	res = results(dds)
 	ressort = res[order(res$padj,decreasing=FALSE),]
 	allresults[[i]] = ressort
 }
 
-##### Part 4: Save the data
+##### Part 4: Annotate the results
+
+for(i in 1:length(allresults)) {
+ensembl = useMart("ensembl")
+ensembl = useDataset("mmusculus_gene_ensembl",mart=ensembl)
+annodata = getBM(attributes=c("ensembl_gene_id","external_gene_name","description"),filters="ensembl_gene_id",values=allresults[[i]]@rownames,mart=ensembl)
+allresults[[i]]@listData = cbind(DataFrame(allresults[[i]]),annodata[match(allresults[[i]]@rownames,annodata$ensembl_gene_id),-1])
+}
+
+##### Part 5: Save the data
 
 save(allresults,file="mouseanalysisresuls.rdata")
